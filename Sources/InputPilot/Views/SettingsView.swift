@@ -58,7 +58,7 @@ struct SettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 260)
+                .frame(width: 280, alignment: .trailing)
             }
 
             SettingsRow(title: "开机启动", subtitle: "登录后自动启动 InputPilot。") {
@@ -74,15 +74,16 @@ struct SettingsView: View {
     private var appRules: some View {
         SettingsCard(title: "应用规则", subtitle: "为单个应用指定输入法，优先级高于全局规则。", icon: "app.badge") {
             VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    Picker("当前运行应用", selection: $selectedRunningAppBundleID) {
+                SettingsRow(title: "当前运行应用", subtitle: "选择已打开的 App，快速创建独立规则。") {
+                    Picker("", selection: $selectedRunningAppBundleID) {
                         Text("请选择应用").tag("")
                         ForEach(runningApps, id: \.bundleIdentifier) { app in
                             Text(app.localizedName ?? app.bundleIdentifier ?? "未知应用")
                                 .tag(app.bundleIdentifier ?? "")
                         }
                     }
-                    .frame(minWidth: 280)
+                    .labelsHidden()
+                    .frame(width: 280, alignment: .trailing)
 
                     Button("添加规则") { addRuleForSelectedApp() }
                         .buttonStyle(.borderedProminent)
@@ -112,22 +113,22 @@ struct SettingsView: View {
 
             SettingsRow(title: "展示方式", subtitle: "焦点跟随需要辅助功能权限。") {
                 ChoiceTabs(selection: binding(\.floatingDisplayMode), items: FloatingDisplayMode.allCases.map { ($0, $0.title) })
-                    .frame(width: 268)
+                    .frame(width: 280, alignment: .trailing)
             }
 
             SettingsRow(title: "显示内容", subtitle: "焦点输入时建议仅显示图标，更轻量。") {
                 ChoiceTabs(selection: binding(\.floatingAppearance), items: FloatingAppearance.allCases.map { ($0, $0.title) })
-                    .frame(width: 250)
+                    .frame(width: 280, alignment: .trailing)
             }
 
             SettingsRow(title: "视觉风格", subtitle: "去掉蓝色背景，使用更克制的系统质感。") {
                 ChoiceTabs(selection: binding(\.floatingTheme), items: FloatingTheme.allCases.map { ($0, $0.title) })
-                    .frame(width: 250)
+                    .frame(width: 280, alignment: .trailing)
             }
 
             SettingsRow(title: "透明度", subtitle: "调整悬浮框背景强度。") {
                 Slider(value: binding(\.floatingOpacity), in: 0.35...1)
-                    .frame(width: 200)
+                    .frame(width: 220)
                 Text("\(Int(store.settings.floatingOpacity * 100))%")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -136,7 +137,7 @@ struct SettingsView: View {
 
             SettingsRow(title: "图标大小", subtitle: "控制焦点处输入法图标尺寸。") {
                 Slider(value: binding(\.floatingSize), in: 22...44)
-                    .frame(width: 200)
+                    .frame(width: 220)
                 Text("\(Int(store.settings.floatingSize))")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -146,7 +147,7 @@ struct SettingsView: View {
             SettingsRow(title: "自动消失", subtitle: "默认 3 秒后渐隐，减少遮挡。") {
                 Toggle("", isOn: binding(\.floatingAutoHide)).labelsHidden()
                 Slider(value: binding(\.floatingHideDelay), in: 1...8, step: 0.5)
-                    .frame(width: 160)
+                    .frame(width: 170)
                     .disabled(!store.settings.floatingAutoHide)
                 Text("\(store.settings.floatingHideDelay, specifier: "%.1f")s")
                     .monospacedDigit()
@@ -160,7 +161,7 @@ struct SettingsView: View {
 
             SettingsRow(title: "焦点偏移", subtitle: "调整图标与输入框之间的距离。") {
                 Slider(value: binding(\.floatingOffsetY), in: 0...24, step: 1)
-                    .frame(width: 200)
+                    .frame(width: 220)
                 Text("\(Int(store.settings.floatingOffsetY))")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -446,6 +447,7 @@ private struct SettingsRow<Content: View>: View {
             }
             Spacer()
             HStack(spacing: 10) { content }
+                .frame(minWidth: 300, alignment: .trailing)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 8)

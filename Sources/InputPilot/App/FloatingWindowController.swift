@@ -1,5 +1,4 @@
 import AppKit
-import SwiftUI
 
 /// 半透明输入法状态悬浮框，使用 NSPanel 保证不抢焦点。
 @MainActor
@@ -7,18 +6,10 @@ final class FloatingWindowController {
     static let shared = FloatingWindowController()
 
     private let panel: NSPanel
-    private let contentView: NSHostingView<FloatingBadgeView>
+    private let badgeView = FloatingBadgeContentView()
     private var hideTask: Task<Void, Never>?
 
     private init() {
-        contentView = NSHostingView(rootView: FloatingBadgeView(
-            text: "",
-            iconText: "拼",
-            opacity: 0.86,
-            size: 30,
-            appearance: .iconOnly,
-            theme: .glass
-        ))
         panel = NSPanel(
             contentRect: NSRect(x: 64, y: 64, width: 44, height: 44),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -32,42 +23,37 @@ final class FloatingWindowController {
         panel.alphaValue = 0
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.ignoresMouseEvents = true
-        contentView.wantsLayer = true
-        contentView.layer?.backgroundColor = NSColor.clear.cgColor
-        panel.contentView = contentView
+        panel.contentView = badgeView
     }
 
     func fittingSize(for settings: AppSettings, text: String) -> CGSize {
-        let preview = NSHostingView(rootView: FloatingBadgeView(
+        FloatingBadgeContentView.fittingSize(
             text: text,
             iconText: iconText(for: text),
-            opacity: settings.floatingOpacity,
             size: settings.floatingSize,
-            appearance: settings.floatingAppearance,
-            theme: settings.floatingTheme
-        ))
-        let size = preview.fittingSize
-        return CGSize(width: max(settings.floatingSize + 12, size.width), height: max(settings.floatingSize + 12, size.height))
+            appearance: settings.floatingAppearance
+        )
     }
 
     func show(text: String, at point: CGPoint, settings: AppSettings) {
-        let size = fittingSize(for: settings, text: text)
-        contentView.rootView = FloatingBadgeView(
-            text: text,
-            iconText: iconText(for: text),
-            opacity: settings.floatingOpacity,
-            size: settings.floatingSize,
-            appearance: settings.floatingAppearance,
-            theme: settings.floatingTheme
-        )
-        contentView.layoutSubtreeIfNeeded()
+        hideTask?.cancel()
 
+        let iconText = iconText(for: text)
+        let size = FloatingBadgeContentView.fittingSize(
+            text: text,
+            iconText: iconText,
+            size: settings.floatingSize,
+            appearance: settings.floatingAppearance
+        )
+
+        // 每次展示都完整刷新配置，避免频繁切换设置时出现旧样式残留。
+        badgeView.configure(text: text, iconText: iconText, settings: settings)
         panel.setContentSize(size)
         panel.setFrameOrigin(clampedOrigin(point, size: size))
+        panel.alphaValue = max(panel.alphaValue, 0)
         panel.orderFrontRegardless()
         fade(to: 1, duration: settings.floatingAnimationEnabled ? 0.16 : 0)
 
-        hideTask?.cancel()
         guard settings.floatingAutoHide else { return }
 
         // 默认 3 秒后淡出，避免悬浮提示长期遮挡输入区域。
@@ -127,62 +113,127 @@ final class FloatingWindowController {
     }
 }
 
-struct FloatingBadgeView: View {
-    let text: String
-    let iconText: String
-    let opacity: Double
-    let size: Double
-    let appearance: FloatingAppearance
-    let theme: FloatingTheme
+/// 使用 AppKit 自绘，确保圆角外完全透明，不再出现浅色直角背景。
+private final class FloatingBadgeContentView: NSView {
+    private var text = ""
+    private var iconText = "拼"
+    private var opacity: Double = 0.86
+    private var size: Double = 30
+    private var badgeAppearance: FloatingAppearance = .iconOnly
+    private var theme: FloatingTheme = .glass
 
-    var body: some View {
-        HStack(spacing: appearance == .iconOnly ? 0 : 8) {
-            Text(iconText)
-                .font(.system(size: size * 0.48, weight: .semibold, design: .rounded))
-                .foregroundStyle(foregroundColor)
-                .frame(width: size, height: size)
-                .background(iconBackground, in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
+    override var isOpaque: Bool { false }
 
-            if appearance == .iconAndName {
-                Text(text)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(foregroundColor)
-                    .lineLimit(1)
-                    .padding(.trailing, 4)
-            }
-        }
-        .padding(appearance == .iconOnly ? 6 : 7)
-        .background(containerBackground, in: RoundedRectangle(cornerRadius: size * 0.38, style: .continuous))
-        .shadow(color: .black.opacity(theme == .dark ? 0.22 : 0.10), radius: 10, y: 4)
-        .fixedSize()
+    func configure(text: String, iconText: String, settings: AppSettings) {
+        self.text = text
+        self.iconText = iconText
+        opacity = settings.floatingOpacity
+        size = settings.floatingSize
+        badgeAppearance = settings.floatingAppearance
+        theme = settings.floatingTheme
+        frame.size = Self.fittingSize(text: text, iconText: iconText, size: settings.floatingSize, appearance: settings.floatingAppearance)
+        needsDisplay = true
+        layoutSubtreeIfNeeded()
     }
 
-    private var foregroundColor: Color {
+    static func fittingSize(text: String, iconText: String, size: Double, appearance: FloatingAppearance) -> CGSize {
+        let padding: CGFloat = appearance == .iconOnly ? 6 : 7
+        let iconSize = CGFloat(size)
+        let height = iconSize + padding * 2
+        guard appearance == .iconAndName else {
+            return CGSize(width: iconSize + padding * 2, height: height)
+        }
+
+        let textWidth = (text as NSString).size(withAttributes: [
+            .font: NSFont.systemFont(ofSize: 13, weight: .semibold)
+        ]).width
+        return CGSize(width: padding * 2 + iconSize + 8 + min(max(textWidth, 42), 180) + 4, height: height)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.clear.setFill()
+        dirtyRect.fill()
+
+        let bounds = bounds.insetBy(dx: 0.5, dy: 0.5)
+        let radius = min(CGFloat(size) * 0.38, bounds.height / 2)
+        let containerPath = NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius)
+        containerColor.setFill()
+        containerPath.fill()
+
+        if theme == .light {
+            NSColor.black.withAlphaComponent(0.06).setStroke()
+            containerPath.lineWidth = 1
+            containerPath.stroke()
+        }
+
+        drawIcon(in: NSRect(x: bounds.minX + contentPadding, y: bounds.midY - CGFloat(size) / 2, width: CGFloat(size), height: CGFloat(size)))
+
+        if badgeAppearance == .iconAndName {
+            drawName(in: NSRect(
+                x: bounds.minX + contentPadding + CGFloat(size) + 8,
+                y: bounds.minY,
+                width: bounds.width - contentPadding * 2 - CGFloat(size) - 8,
+                height: bounds.height
+            ))
+        }
+    }
+
+    private var contentPadding: CGFloat { badgeAppearance == .iconOnly ? 6 : 7 }
+
+    private var containerColor: NSColor {
+        switch theme {
+        case .glass:
+            return NSColor.windowBackgroundColor.withAlphaComponent(opacity)
+        case .light:
+            return NSColor.white.withAlphaComponent(opacity)
+        case .dark:
+            return NSColor.black.withAlphaComponent(max(0.35, opacity * 0.72))
+        }
+    }
+
+    private var foregroundColor: NSColor {
         switch theme {
         case .dark: .white
-        case .light, .glass: Color.primary
+        case .glass, .light: .labelColor
         }
     }
 
-    private var containerBackground: some ShapeStyle {
+    private var iconBackgroundColor: NSColor {
         switch theme {
         case .glass:
-            return AnyShapeStyle(.ultraThinMaterial.opacity(opacity))
+            return NSColor.white.withAlphaComponent(0.16)
         case .light:
-            return AnyShapeStyle(Color.white.opacity(opacity))
+            return NSColor.black.withAlphaComponent(0.06)
         case .dark:
-            return AnyShapeStyle(Color.black.opacity(max(0.35, opacity * 0.72)))
+            return NSColor.white.withAlphaComponent(0.12)
         }
     }
 
-    private var iconBackground: some ShapeStyle {
-        switch theme {
-        case .glass:
-            return AnyShapeStyle(Color.white.opacity(0.12))
-        case .light:
-            return AnyShapeStyle(Color.black.opacity(0.06))
-        case .dark:
-            return AnyShapeStyle(Color.white.opacity(0.12))
-        }
+    private func drawIcon(in rect: NSRect) {
+        let path = NSBezierPath(roundedRect: rect, xRadius: CGFloat(size) * 0.28, yRadius: CGFloat(size) * 0.28)
+        iconBackgroundColor.setFill()
+        path.fill()
+
+        let font = NSFont.systemFont(ofSize: CGFloat(size) * 0.48, weight: .semibold)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: foregroundColor
+        ]
+        let attributed = NSAttributedString(string: iconText, attributes: attributes)
+        let textSize = attributed.size()
+        attributed.draw(at: NSPoint(x: rect.midX - textSize.width / 2, y: rect.midY - textSize.height / 2))
+    }
+
+    private func drawName(in rect: NSRect) {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
+            .foregroundColor: foregroundColor,
+            .paragraphStyle: paragraph
+        ]
+        let attributed = NSAttributedString(string: text, attributes: attributes)
+        let textSize = attributed.size()
+        attributed.draw(in: NSRect(x: rect.minX, y: rect.midY - textSize.height / 2, width: rect.width, height: textSize.height))
     }
 }

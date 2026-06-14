@@ -61,6 +61,25 @@ InputPilot 不读取、不保存你的输入内容。
 4. 如需针对某个 App 单独设置，进入「应用规则」添加规则。
 5. 如需显示输入法提示，进入「悬浮提示」调整样式和消失时间。
 
+
+## 截图预览
+
+<p align="center">
+  <img src="docs/images/settings-basic.png" width="720" alt="基础设置" />
+</p>
+
+<p align="center">
+  <img src="docs/images/settings-rules.png" width="720" alt="应用规则" />
+</p>
+
+<p align="center">
+  <img src="docs/images/floating-focus.png" width="420" alt="悬浮提示" />
+</p>
+
+<p align="center">
+  <img src="docs/images/menubar.png" width="360" alt="菜单栏" />
+</p>
+
 ## License
 
 MIT
