@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Create unsigned testing DMG
+        run: ./scripts/create_dmg.sh
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/InputPilot.dmg
+          draft: false
+          prerelease: false
