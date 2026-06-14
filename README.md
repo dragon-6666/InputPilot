@@ -1,114 +1,65 @@
 # InputPilot
 
-InputPilot 是一个面向 Apple Silicon Mac 的原生菜单栏工具，用于监控并自动恢复你习惯使用的输入法，避免系统意外切回 ABC 后造成误输入。
+InputPilot 是一个 macOS 菜单栏小工具，用来自动守护你常用的输入法，避免系统意外切回 ABC 后造成误输入。
 
-## 功能
+## 主要功能
 
-- 全局输入法守护：窗口/应用切换后自动检查并切回预设输入法。
-- 应用级规则：为指定 App 设置独立输入法，优先级高于全局规则。
-- 菜单栏常驻：不占 Dock，支持快速启停守护与打开设置。
-- 开机启动：基于 macOS `SMAppService`。
-- 悬浮提示：支持固定位置与焦点跟随展示当前输入法。
-- 原生实现：Swift 6 + SwiftUI + AppKit，最低支持 macOS 13。
+- 全局输入法守护：切换窗口或应用后自动恢复指定输入法。
+- 应用级规则：可为不同 App 设置不同输入法。
+- 菜单栏常驻：不占 Dock，支持快速启停守护。
+- 开机启动：登录后自动运行。
+- 悬浮提示：可在固定位置或输入焦点附近显示当前输入法状态。
+- Apple Silicon 原生支持，最低支持 macOS 13。
 
-## Bundle ID
+## 下载安装
 
-正式第三方分发默认使用：
+前往 GitHub Releases 下载最新的 `InputPilot.dmg`：
 
-```text
-com.wwl.inputpilot
-```
+[下载 InputPilot](https://github.com/dragon-6666/InputPilot/releases)
 
-如果后续有公司或个人域名，建议改成自己的反域名格式，例如 `com.yourdomain.inputpilot`，发布后不要频繁变更，否则辅助功能权限可能需要重新授权。
+安装方式：
 
-## 权限说明
+1. 打开 `InputPilot.dmg`。
+2. 将 `InputPilot.app` 拖入 `Applications`。
+3. 从「应用程序」中启动 InputPilot。
 
-焦点跟随模式需要辅助功能权限。首次使用时可在「设置 - 权限」中点击请求授权，然后在系统设置中允许 InputPilot。
+## 首次打开提示
 
-开发测试包如果使用 ad-hoc 签名，覆盖安装后 macOS 可能重新要求辅助功能授权。正式发布请使用固定 Developer ID Application 证书签名并公证。
+当前版本是免费开源分发包，没有使用 Apple Developer ID 公证。首次打开时，macOS 可能会提示无法验证开发者。
 
-## 本地开发
-
-```bash
-cd InputPilot
-swift run
-```
-
-## 本地打包
-
-生成测试 `.dmg`：
-
-```bash
-./scripts/create_dmg.sh
-```
-
-未设置 `DEVELOPER_ID_APPLICATION` 时会使用 ad-hoc 签名，仅适合本地测试。
-
-## GitHub 免费发布模式
-
-当前项目默认使用免费分发模式：
-
-```text
-ad-hoc 签名 + DMG + GitHub Release
-```
-
-不需要 Apple Developer 账号，也不需要 Developer ID 和公证。缺点是用户首次打开时 macOS 会提示安全拦截。
-
-用户安装后如果打不开，可以这样操作：
+可以这样打开：
 
 ```text
 右键 InputPilot.app → 打开 → 再点“打开”
 ```
 
-或者：
+如果仍被拦截：
 
 ```text
 系统设置 → 隐私与安全性 → 仍要打开
 ```
 
-> 注意：免费分发包因为没有固定 Developer ID 签名，覆盖安装后辅助功能权限可能需要重新授权，这是 macOS 的安全机制。
+## 权限说明
 
-## GitHub Release
+InputPilot 的「焦点跟随」悬浮提示需要辅助功能权限，用于获取当前输入框或光标位置。
 
-推送 tag 即可发布 DMG：
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-GitHub Actions 会自动：
-
-1. 构建 Apple Silicon 版本。
-2. 使用 ad-hoc 签名。
-3. 生成 `InputPilot.dmg`。
-4. 上传到 GitHub Release。
-
-## 可选：未来正式签名
-
-如果以后要改善安装体验，可以再接入 Apple Developer ID：
-
-```bash
-export DEVELOPER_ID_APPLICATION="Developer ID Application: Your Name (TEAMID)"
-./scripts/create_dmg.sh
-
-export NOTARY_KEY_ID="YOUR_KEY_ID"
-export NOTARY_ISSUER_ID="YOUR_ISSUER_ID"
-export NOTARY_KEY_PATH="/path/to/AuthKey_XXXXXX.p8"
-./scripts/notarize_dmg.sh dist/InputPilot.dmg
-```
-
-## 项目结构
+授权路径：
 
 ```text
-Sources/InputPilot
-├── App        # AppKit 生命周期、菜单栏、窗口、悬浮框
-├── Core       # 预留核心能力目录
-├── Models     # 设置、输入法、应用规则模型
-├── Services   # 输入法、权限、守护、设置存储服务
-├── Views      # SwiftUI 设置页面
-└── Packaging  # Info.plist 与发布配置
+系统设置 → 隐私与安全性 → 辅助功能 → 打开 InputPilot
 ```
+
+InputPilot 不读取、不保存你的输入内容。
+
+> 免费分发包覆盖安装后，macOS 可能要求重新授权辅助功能权限，这是系统安全机制导致的。
+
+## 使用说明
+
+1. 点击菜单栏 InputPilot 图标。
+2. 打开设置。
+3. 在「基础设置」里选择全局默认输入法。
+4. 如需针对某个 App 单独设置，进入「应用规则」添加规则。
+5. 如需显示输入法提示，进入「悬浮提示」调整样式和消失时间。
 
 ## License
 
