@@ -17,9 +17,7 @@ struct SettingsView: View {
     var body: some View {
         HStack(spacing: 0) {
             SettingsSidebar(selectedSection: $selectedSection)
-
             Divider()
-
             ScrollView {
                 selectedContent
                     .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -84,6 +82,8 @@ struct SettingsView: View {
                                 .tag(app.bundleIdentifier ?? "")
                         }
                     }
+                    .frame(minWidth: 280)
+
                     Button("添加规则") { addRuleForSelectedApp() }
                         .buttonStyle(.borderedProminent)
                         .disabled(selectedRunningAppBundleID.isEmpty || inputSources.isEmpty)
@@ -111,36 +111,18 @@ struct SettingsView: View {
             }
 
             SettingsRow(title: "展示方式", subtitle: "焦点跟随需要辅助功能权限。") {
-                Picker("", selection: binding(\.floatingDisplayMode)) {
-                    ForEach(FloatingDisplayMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 220)
+                ChoiceTabs(selection: binding(\.floatingDisplayMode), items: FloatingDisplayMode.allCases.map { ($0, $0.title) })
+                    .frame(width: 268)
             }
 
             SettingsRow(title: "显示内容", subtitle: "焦点输入时建议仅显示图标，更轻量。") {
-                Picker("", selection: binding(\.floatingAppearance)) {
-                    ForEach(FloatingAppearance.allCases) { appearance in
-                        Text(appearance.title).tag(appearance)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 190)
+                ChoiceTabs(selection: binding(\.floatingAppearance), items: FloatingAppearance.allCases.map { ($0, $0.title) })
+                    .frame(width: 250)
             }
 
             SettingsRow(title: "视觉风格", subtitle: "去掉蓝色背景，使用更克制的系统质感。") {
-                Picker("", selection: binding(\.floatingTheme)) {
-                    ForEach(FloatingTheme.allCases) { theme in
-                        Text(theme.title).tag(theme)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 190)
+                ChoiceTabs(selection: binding(\.floatingTheme), items: FloatingTheme.allCases.map { ($0, $0.title) })
+                    .frame(width: 250)
             }
 
             SettingsRow(title: "透明度", subtitle: "调整悬浮框背景强度。") {
@@ -207,6 +189,7 @@ struct SettingsView: View {
                 .foregroundStyle(accessibilityTrusted ? .green : .orange)
 
                 Button(accessibilityTrusted ? "重新检测" : "请求授权") { refreshAccessibilityPermission() }
+                    .buttonStyle(.bordered)
             }
 
             Text("授权后会自动刷新状态，并在下一次焦点聚焦/窗口切换时显示在输入框附近。未授权时自动降级为固定位置显示。")
@@ -311,17 +294,13 @@ private struct SettingsSidebar: View {
 
             VStack(spacing: 6) {
                 ForEach(SettingsSection.allCases) { section in
-                    Button {
+                    SidebarItemButton(
+                        title: section.title,
+                        icon: section.icon,
+                        isSelected: selectedSection == section
+                    ) {
                         selectedSection = section
-                    } label: {
-                        Label(section.title, systemImage: section.icon)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 9)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(selectedSection == section ? .white : .primary)
-                    .background(selectedSection == section ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
             }
             .padding(.horizontal, 10)
@@ -330,6 +309,40 @@ private struct SettingsSidebar: View {
         }
         .frame(width: 190)
         .background(.bar)
+    }
+}
+
+private struct SidebarItemButton: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .frame(width: 18)
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isSelected ? .white : .primary)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isSelected ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(isSelected ? Color.clear : Color.primary.opacity(0.10), lineWidth: 1)
+        )
+        .opacity(isSelected ? 1 : 0.98)
     }
 }
 
@@ -345,6 +358,7 @@ private struct RuleRow: View {
                 set: { updateRule(isEnabled: $0) }
             ))
             .labelsHidden()
+            .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(rule.appName).font(.headline)
@@ -362,6 +376,7 @@ private struct RuleRow: View {
                 }
             }
             .frame(width: 240)
+            .pickerStyle(.menu)
 
             Button(role: .destructive) {
                 store.removeRule(bundleIdentifier: rule.bundleIdentifier)
@@ -371,6 +386,8 @@ private struct RuleRow: View {
             .buttonStyle(.borderless)
         }
         .padding(12)
+        .contentShape(Rectangle())
+        .background(Color.clear)
     }
 
     private func updateRule(isEnabled: Bool? = nil, inputSourceID: String? = nil) {
@@ -431,7 +448,9 @@ private struct SettingsRow<Content: View>: View {
             HStack(spacing: 10) { content }
         }
         .padding(.vertical, 12)
-        .overlay(alignment: .bottom) { Divider().opacity(0.55) }
+        .padding(.horizontal, 8)
+        .contentShape(Rectangle())
+        .overlay(alignment: .bottom) { Divider().opacity(0.5) }
     }
 }
 
@@ -444,5 +463,39 @@ private struct EmptyStateView: View {
             .frame(maxWidth: .infinity)
             .padding(28)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+private struct ChoiceTabs<Value: Hashable>: View {
+    @Binding var selection: Value
+    let items: [(Value, String)]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                Button {
+                    selection = item.0
+                } label: {
+                    Text(item.1)
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 10)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(selection == item.0 ? .white : .primary)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(selection == item.0 ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(selection == item.0 ? Color.clear : Color.primary.opacity(0.14), lineWidth: 1)
+                )
+            }
+        }
+        .padding(4)
+        .background(Color(nsColor: .underPageBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
